@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="100" fill="#1e293b"/>
+  <!-- 値札の形 -->
+  <path d="M120 150 h190 l100 106 l-100 106 h-190 z" fill="#ffffff"/>
+  <circle cx="300" cy="256" r="22" fill="#1e293b"/>
+  <text x="200" y="300" font-size="130" font-family="'Hiragino Sans', 'Yu Gothic', sans-serif" font-weight="700" text-anchor="middle" fill="#1e293b">出</text>
+  <circle cx="160" cy="420" r="30" fill="#7c3aed"/>
+  <circle cx="352" cy="420" r="30" fill="#dc2626"/>
+</svg>

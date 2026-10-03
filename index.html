@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>メルカリ出品ジェネレーター</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#1e293b">
+<style>
+  /* 色の定義：ジョジョ＝紫、ワンピース＝赤 */
+  :root {
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --text: #1e293b;
+    --sub: #64748b;
+    --border: #e2e8f0;
+    --accent: #7c3aed;
+    --accent-bg: #f5f3ff;
+    --warn: #b45309;
+    --warn-bg: #fffbeb;
+    --danger: #dc2626;
+  }
+  body.wcf { --accent: #dc2626; --accent-bg: #fef2f2; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 16px;
+    padding-bottom: 90px;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; background: #1e293b; color: #fff;
+  }
+  header h1 { font-size: 17px; margin: 0; }
+  header button { background: none; border: 1px solid #475569; color: #fff; border-radius: 8px; padding: 6px 10px; font-size: 14px; }
+
+  /* ジョジョ／ワンピースの切り替え */
+  .tabs { display: flex; gap: 8px; padding: 12px 16px 0; }
+  .tabs button {
+    flex: 1; padding: 12px 0; font-size: 16px; font-weight: 700;
+    border: 2px solid var(--border); border-radius: 12px; background: var(--card); color: var(--sub);
+  }
+  .tabs button.on { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); }
+
+  section { margin: 16px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+  section h2 { font-size: 16px; margin: 0 0 10px; }
+  section h2 .num {
+    display: inline-block; width: 24px; height: 24px; line-height: 24px; text-align: center;
+    border-radius: 50%; background: var(--accent); color: #fff; font-size: 14px; margin-right: 6px;
+  }
+  input[type=search], input[type=text], textarea {
+    width: 100%; font-size: 16px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+    font-family: inherit; background: #fff; color: var(--text);
+  }
+  textarea { resize: vertical; line-height: 1.5; }
+  .hint { color: var(--sub); font-size: 13px; margin: 6px 0; }
+
+  /* 商品の一覧 */
+  .item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--border);
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .item:last-child { border-bottom: none; }
+  .item .box {
+    flex: none; width: 24px; height: 24px; border: 2px solid var(--border); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center; color: #fff; font-size: 16px;
+  }
+  .item.on .box { background: var(--accent); border-color: var(--accent); }
+  .item.on { background: var(--accent-bg); }
+  .item .main { flex: 1; min-width: 0; }
+  .item .name { font-size: 15px; }
+  .item .no { font-weight: 700; margin-right: 4px; }
+  .item .meta { font-size: 12px; color: var(--sub); margin-top: 2px; }
+  .badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 6px; margin-left: 4px; }
+  .badge.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid #fcd34d; }
+
+  details { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
+  details > summary {
+    padding: 12px; list-style: none; cursor: pointer; font-size: 15px; display: flex; justify-content: space-between; gap: 8px;
+  }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::after { content: "▼"; color: var(--sub); font-size: 12px; }
+  details[open] > summary::after { content: "▲"; }
+  details > summary > span:first-child { flex: 1; }
+  details > summary .count { color: var(--sub); font-size: 13px; white-space: nowrap; }
+  details .inner { padding: 0 10px 10px; }
+  details details { margin: 6px 0; }
+
+  .btn {
+    display: inline-block; font-size: 15px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--accent);
+    background: var(--card); color: var(--accent); font-weight: 700; text-decoration: none; text-align: center;
+  }
+  .btn.fill { background: var(--accent); color: #fff; }
+  .btn.small { font-size: 13px; padding: 6px 10px; }
+  .btn.wide { display: block; width: 100%; margin-top: 8px; }
+  .btn.gray { border-color: var(--border); color: var(--sub); }
+
+  /* 選んだ商品 */
+  .sel { border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-bottom: 8px; }
+  .sel .row { display: flex; align-items: flex-start; gap: 6px; }
+  .sel .row .main { flex: 1; min-width: 0; }
+  .sel .ops { display: flex; gap: 4px; flex: none; }
+  .sel .ops button {
+    width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 8px; background: #fff; font-size: 15px; color: var(--text);
+  }
+  .sel input { margin-top: 8px; font-size: 15px; padding: 8px 10px; }
+  .sel .links { margin-top: 6px; display: flex; gap: 14px; font-size: 13px; }
+  .sel .links a { color: var(--accent); }
+  .edit { margin-top: 8px; padding: 8px; background: var(--bg); border-radius: 8px; }
+  .edit label { font-size: 13px; color: var(--sub); display: block; margin-top: 4px; }
+
+  /* 状態の選択 */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips label {
+    display: inline-flex; align-items: center; gap: 4px; padding: 8px 10px; border: 1px solid var(--border);
+    border-radius: 20px; font-size: 14px; background: #fff;
+  }
+  .chips input { display: none; }
+  .chips label:has(input:checked) { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .label { font-size: 14px; font-weight: 700; margin: 12px 0 6px; }
+
+  /* できあがり */
+  .outhead { display: flex; justify-content: space-between; align-items: center; margin: 10px 0 6px; }
+  .outhead .len { font-size: 13px; color: var(--sub); }
+  .outhead .len.over { color: var(--danger); font-weight: 700; }
+
+  /* 画面下の固定バー */
+  .bar {
+    position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(255,255,255,.96); border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center;
+  }
+  .bar .info { flex: 1; font-size: 15px; }
+  .bar .info b { color: var(--accent); font-size: 18px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); background: #1e293b; color: #fff;
+    padding: 10px 18px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+
+  /* 設定画面 */
+  .modal { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: none; align-items: flex-end; z-index: 10; }
+  .modal.show { display: flex; }
+  .modal .panel {
+    background: var(--card); width: 100%; max-height: 90vh; overflow: auto; border-radius: 16px 16px 0 0;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+  .modal h3 { margin: 4px 0 12px; font-size: 17px; }
+  .modal h4 { margin: 16px 0 6px; font-size: 15px; }
+  .empty { color: var(--sub); font-size: 14px; text-align: center; padding: 12px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>メルカリ出品ジェネレーター</h1>
+  <button id="openSettings">⚙ 設定</button>
+</header>
+
+<div class="tabs">
+  <button data-game="jojo">ジョジョABC</button>
+  <button data-game="wcf">ワンピースWCF</button>
+</div>
+
+<!-- 1. 商品を選ぶ -->
+<section id="step1">
+  <h2><span class="num">1</span>商品を選ぶ</h2>
+  <input type="search" id="q" placeholder="例：カーズ / J-004 / vol.27 / しらほし">
+  <p class="hint" id="qhint">文字を入れると候補が出ます。入れなければ下の一覧からたどれます。</p>
+  <div id="browse"></div>
+</section>
+
+<!-- 2. 選んだ商品 -->
+<section id="step2">
+  <h2><span class="num">2</span>選んだ商品</h2>
+  <p class="hint">↑↓で並べ替えると、商品名に入るキャラの順番も変わります。</p>
+  <div id="selected"></div>
+</section>
+
+<!-- 3. 状態 -->
+<section id="step3">
+  <h2><span class="num">3</span>状態</h2>
+  <div class="label">メルカリの「商品の状態」</div>
+  <div class="chips" id="cond"></div>
+  <div class="label">全部に共通する状態(説明文に入ります)</div>
+  <div class="chips" id="checks"></div>
+  <div class="label">ひとこと(自由に書けます)</div>
+  <textarea id="free" rows="2" placeholder="例：ケースに入れて保管していました"></textarea>
+</section>
+
+<!-- 4. できあがり -->
+<section id="step4">
+  <h2><span class="num">4</span>できあがり</h2>
+  <div class="outhead"><b>商品名</b><span class="len" id="titleLen"></span></div>
+  <textarea id="outTitle" rows="2"></textarea>
+  <button class="btn fill wide" data-copy="outTitle">商品名をコピー</button>
+
+  <div class="outhead"><b>説明文</b><span class="len" id="descLen"></span></div>
+  <textarea id="outDesc" rows="14"></textarea>
+  <button class="btn fill wide" data-copy="outDesc">説明文をコピー</button>
+
+  <a class="btn wide" id="soldLink" target="_blank" rel="noopener">メルカリで売れた値段を見る</a>
+  <p class="hint">選び直したり状態を変えたりすると、手直しした文章は作り直されます。手直しは最後にしてください。</p>
+</section>
+
+<div class="bar">
+  <div class="info">選択中 <b id="selCount">0</b> 点</div>
+  <button class="btn gray small" id="clearSel">全部外す</button>
+  <a class="btn fill small" href="#step2">出品文へ ↓</a>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 設定画面 -->
+<div class="modal" id="settings">
+  <div class="panel">
+    <h3>設定</h3>
+    <h4>注意事項の定型文</h4>
+    <textarea id="noticeText" rows="6"></textarea>
+    <button class="btn small" id="resetNotice" style="margin-top:6px">最初の文章に戻す</button>
+
+    <h4>直した番号・名前</h4>
+    <p class="hint" id="ovInfo"></p>
+    <p class="hint">ここで書き出した内容をClaudeに渡すと、元のリストに反映できます。</p>
+    <button class="btn fill wide" id="ovCopy">直した内容をコピー</button>
+    <button class="btn wide" id="ovSave">直した内容をファイルに保存</button>
+    <button class="btn gray wide" id="ovClear">直した内容を全部消す</button>
+
+    <button class="btn wide" id="closeSettings" style="margin-top:20px">閉じる</button>
+  </div>
+</div>
+
+<script>
+// ===== 初期の設定値 =====
+const DEFAULT_NOTICE =
+  '即購入OKです。\n' +
+  'すり替え防止のため、返品交換はお受けできません。\n' +
+  '入手後、暗所にて保管しておりましたが素人保管ですので、完璧な状態を望む方は購入をご遠慮ください。';
+const CONDITIONS = ['新品・未使用', '未使用に近い', '目立った傷や汚れなし', 'やや傷や汚れあり', '傷や汚れあり', '全体的に状態が悪い'];
+const CHECKS = {
+  jojo: ['傷あり', 'スリーブ保管', '角に白欠けあり', '反りあり'],
+  wcf: ['箱に痛みあり', '未開封', '開封済み(内袋あり)', '箱あり', '箱なし', '台座あり'],
+};
+const TITLE_MAX = 40;   // メルカリの商品名の文字数上限
+const DESC_MAX = 1000;  // メルカリの説明文の文字数上限
+
+// ===== スマホの中に保存する仕組み(使えない環境でも止まらないようにする) =====
+function load(key, fallback) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
+}
+function save(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+}
+
+// 画面の状態(選んだ商品・状態など)。ゲームごとに分けて覚える
+const state = load('mg_state_v1', {
+  game: 'jojo',
+  jojo: { sel: [], notes: {}, cond: '', checks: [], free: '' },
+  wcf: { sel: [], notes: {}, cond: '', checks: [], free: '' },
+});
+let notice = load('mg_notice_v1', DEFAULT_NOTICE);
+let overrides = load('mg_overrides_v1', {});  // 直した番号・名前 { 商品ID: {no, name} }
+
+const DATA = { jojo: null, wcf: null, tags: null };
+const ITEMS = { jojo: [], wcf: [] };  // 商品の一覧
+const BYID = {};                       // 商品IDから商品を探すための表
+
+// ===== 文字の比較用(全角半角・ひらがなカタカナ・記号の違いをならす) =====
+function norm(s) {
+  return (s || '').normalize('NFKC').toLowerCase()
+    .replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
+    .replace(/[\s・･\-－ー~～「」『』()（）.,、。!！?？&＆]/g, '');
+}
+
+// ===== データの読み込み =====
+async function loadData() {
+  const [jojo, wcf, tags] = await Promise.all(['jojo.json', 'wcf.json', 'tags.json'].map((f) => fetch(f).then((r) => r.json())));
+  DATA.jojo = jojo; DATA.wcf = wcf; DATA.tags = tags;
+  // ジョジョ:[番号, 名前, 収録弾, 種類, レア度, 部, 備考]
+  ITEMS.jojo = jojo.map(([no, name, series, kind, rarity, parts, note]) => ({
+    g: 'jojo', id: `jojo|${series}|${no}|${name}`, no0: no, name0: name, series, kind, rarity, parts, note,
+  }));
+  // ワンピース:シリーズ表 + [番号, 名前, シリーズ番号, 確認状況, 番号の出典]
+  ITEMS.wcf = wcf.figs.map(([no, name, si, check, src], i) => {
+    const [full, short, date, kinds] = wcf.series[si];
+    return { g: 'wcf', id: `wcf|${full}|${no}|${name}|${i}`, no0: no, name0: name, si, series: full, short, date, kinds, check, src };
+  });
+  for (const g of ['jojo', 'wcf']) for (const it of ITEMS[g]) {
+    BYID[it.id] = it;
+    it.key = norm(`${it.no0} ${it.name0} ${it.series} ${it.short || ''} ${it.parts || ''}`);
+  }
+}
+// 直した内容があればそちらを使う
+function no(it) { return (overrides[it.id] && overrides[it.id].no !== undefined) ? overrides[it.id].no : it.no0; }
+function nm(it) { return (overrides[it.id] && overrides[it.id].name) || it.name0; }
+
+// ===== 表示用の部品 =====
+function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function cur() { return state[state.game]; }
+function isSel(id) { return cur().sel.includes(id); }
+
+function metaText(it) {
+  if (it.g === 'jojo') return [it.series, it.kind, it.rarity, it.parts].filter(Boolean).join('・');
+  return [cleanSeries(it.short), it.date].filter(Boolean).join('・');
+}
+function badges(it) {
+  let b = '';
+  if (it.g === 'wcf') {
+    if (!no(it)) b += '<span class="badge warn">番号なし</span>';
+    else if ((it.src || '').includes('要確認')) b += '<span class="badge warn">番号要確認</span>';
+    if (it.check) b += '<span class="badge warn">要確認</span>';
+  }
+  if (overrides[it.id]) b += '<span class="badge warn">修正済み</span>';
+  return b;
+}
+function itemRow(it) {
+  const n = no(it);
+  return `<div class="item ${isSel(it.id) ? 'on' : ''}" data-id="${esc(it.id)}">
+    <div class="box">${isSel(it.id) ? '✓' : ''}</div>
+    <div class="main"><div class="name">${n ? `<span class="no">${esc(n)}</span>` : ''}${esc(nm(it))}${badges(it)}</div>
+    <div class="meta">${esc(metaText(it))}</div></div></div>`;
+}
+
+// ===== 1. 商品を選ぶ =====
+function renderBrowse() {
+  const q = norm(document.getElementById('q').value);
+  const box = document.getElementById('browse');
+  const items = ITEMS[state.game];
+  if (q) {
+    // 検索:入力した言葉(スペース区切りはすべて含むもの)で絞り込む
+    const words = document.getElementById('q').value.split(/\s+/).map(norm).filter(Boolean);
+    const hit = items.filter((it) => words.every((w) => it.key.includes(w) || norm(no(it) + nm(it)).includes(w)));
+    document.getElementById('qhint').textContent = `${hit.length}件見つかりました${hit.length > 80 ? '(先頭80件を表示)' : ''}`;
+    box.innerHTML = hit.slice(0, 80).map(itemRow).join('') || '<div class="empty">見つかりませんでした</div>';
+    return;
+  }
+  document.getElementById('qhint').textContent = '文字を入れると候補が出ます。入れなければ下の一覧からたどれます。';
+  box.innerHTML = state.game === 'jojo' ? browseJojo() : browseWcf();
+}
+function seriesBlock(key, title, count) {
+  return `<details data-series="${esc(key)}"><summary><span>${esc(title)}</span><span class="count">${count}種</span></summary><div class="inner"></div></details>`;
+}
+function browseJojo() {
+  const order = [...new Set(ITEMS.jojo.map((it) => it.series))];
+  return order.map((s) => seriesBlock(s, s, ITEMS.jojo.filter((it) => it.series === s).length)).join('');
+}
+function browseWcf() {
+  // 年ごとにまとめて、新しい年を上にする
+  const years = {};
+  DATA.wcf.series.forEach(([full, short, date, kinds], si) => {
+    const y = (date.match(/^(\d{4})年/) || [, 'その他'])[1];
+    (years[y] = years[y] || []).push({ si, full, short, date, kinds });
+  });
+  return Object.keys(years).sort().reverse().map((y) =>
+    `<details><summary><span>${y}年</span><span class="count">${years[y].length}シリーズ</span></summary><div class="inner">` +
+    years[y].map((s) => seriesBlock(String(s.si), `${cleanSeries(s.short)}(${s.date})`, s.kinds || '?')).join('') +
+    `</div></details>`).join('');
+}
+function seriesItems(key) {
+  return state.game === 'jojo' ? ITEMS.jojo.filter((it) => it.series === key) : ITEMS.wcf.filter((it) => String(it.si) === key);
+}
+// シリーズを開いたときに中身を作る(最初から全部作ると重いため)
+document.getElementById('browse').addEventListener('toggle', (e) => {
+  const d = e.target;
+  if (!d.open || !d.dataset.series) return;
+  const its = seriesItems(d.dataset.series);
+  d.querySelector('.inner').innerHTML =
+    `<button class="btn small" data-all="${esc(d.dataset.series)}">全種まとめて選ぶ</button>` + its.map(itemRow).join('');
+}, true);
+
+document.getElementById('browse').addEventListener('click', (e) => {
+  const all = e.target.closest('[data-all]');
+  if (all) {
+    const ids = seriesItems(all.dataset.all).map((it) => it.id);
+    const c = cur();
+    const allOn = ids.every((id) => c.sel.includes(id));
+    // すでに全部選んでいれば外す、そうでなければ全部選ぶ
+    c.sel = allOn ? c.sel.filter((id) => !ids.includes(id)) : c.sel.concat(ids.filter((id) => !c.sel.includes(id)));
+    refreshRows(); update();
+    toast(allOn ? 'まとめて外しました' : `${ids.length}点を選びました`);
+    return;
+  }
+  const row = e.target.closest('.item');
+  if (!row) return;
+  toggle(row.dataset.id);
+});
+function toggle(id) {
+  const c = cur();
+  c.sel = c.sel.includes(id) ? c.sel.filter((x) => x !== id) : c.sel.concat(id);
+  refreshRows(); update();
+}
+// 一覧の見た目(チェック)だけを更新する
+function refreshRows() {
+  document.querySelectorAll('#browse .item').forEach((row) => {
+    const on = isSel(row.dataset.id);
+    row.classList.toggle('on', on);
+    row.querySelector('.box').textContent = on ? '✓' : '';
+  });
+}
+
+// ===== 2. 選んだ商品 =====
+function selItems() { return cur().sel.map((id) => BYID[id]).filter(Boolean); }
+function renderSelected() {
+  const box = document.getElementById('selected');
+  const its = selItems();
+  if (!its.length) { box.innerHTML = '<div class="empty">まだ選んでいません</div>'; return; }
+  box.innerHTML = its.map((it, i) => {
+    const n = no(it);
+    return `<div class="sel" data-id="${esc(it.id)}">
+      <div class="row"><div class="main"><div class="name">${n ? `<b>${esc(n)}</b> ` : ''}${esc(nm(it))}${badges(it)}</div>
+      <div class="meta hint" style="margin:2px 0 0">${esc(metaText(it))}</div></div>
+      <div class="ops"><button data-op="up" ${i === 0 ? 'disabled' : ''}>↑</button><button data-op="down" ${i === its.length - 1 ? 'disabled' : ''}>↓</button><button data-op="del">✕</button></div></div>
+      <input type="text" data-op="note" placeholder="この商品だけの状態(例：開封済みです)" value="${esc(cur().notes[it.id] || '')}">
+      <div class="links"><a href="#" data-op="edit">番号・名前を直す</a><a href="${soldUrl(soldKeyword([it]))}" target="_blank" rel="noopener">相場を見る</a></div>
+      <div class="edit" hidden>
+        <label>番号</label><input type="text" data-f="no" value="${esc(n)}">
+        <label>名前</label><input type="text" data-f="name" value="${esc(nm(it))}">
+        <div style="display:flex;gap:6px;margin-top:8px"><button class="btn small fill" data-op="saveEdit">保存</button>
+        <button class="btn small gray" data-op="resetEdit">元に戻す</button></div>
+      </div></div>`;
+  }).join('');
+}
+document.getElementById('selected').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-op]');
+  if (!b || b.dataset.op === 'note') return;
+  const card = b.closest('.sel'); const id = card.dataset.id; const c = cur(); const i = c.sel.indexOf(id);
+  const op = b.dataset.op;
+  if (op === 'up' && i > 0) [c.sel[i - 1], c.sel[i]] = [c.sel[i], c.sel[i - 1]];
+  else if (op === 'down' && i < c.sel.length - 1) [c.sel[i + 1], c.sel[i]] = [c.sel[i], c.sel[i + 1]];
+  else if (op === 'del') { c.sel.splice(i, 1); refreshRows(); }
+  else if (op === 'edit') { e.preventDefault(); card.querySelector('.edit').hidden = !card.querySelector('.edit').hidden; return; }
+  else if (op === 'saveEdit') {
+    const it = BYID[id];
+    const newNo = card.querySelector('[data-f=no]').value.trim();
+    const newName = card.querySelector('[data-f=name]').value.trim() || it.name0;
+    if (newNo === it.no0 && newName === it.name0) delete overrides[id];
+    else overrides[id] = { no: newNo, name: newName };
+    save('mg_overrides_v1', overrides); toast('直した内容を覚えました'); renderBrowse();
+  } else if (op === 'resetEdit') {
+    delete overrides[id]; save('mg_overrides_v1', overrides); toast('元に戻しました'); renderBrowse();
+  } else return;
+  update();
+});
+// 商品ごとのひとことは、入力するたびに文章へ反映する(入力欄は作り直さない)
+document.getElementById('selected').addEventListener('input', (e) => {
+  if (e.target.dataset.op !== 'note') return;
+  cur().notes[e.target.closest('.sel').dataset.id] = e.target.value;
+  generate(); persist();
+});
+
+// ===== 3. 状態 =====
+function renderCondition() {
+  const c = cur();
+  document.getElementById('cond').innerHTML = CONDITIONS.map((x) =>
+    `<label><input type="radio" name="cond" value="${x}" ${c.cond === x ? 'checked' : ''}>${x}</label>`).join('');
+  document.getElementById('checks').innerHTML = CHECKS[state.game].map((x) =>
+    `<label><input type="checkbox" value="${x}" ${c.checks.includes(x) ? 'checked' : ''}>${x}</label>`).join('');
+  document.getElementById('free').value = c.free;
+}
+document.getElementById('cond').addEventListener('change', (e) => {
+  // 同じものをもう一度押すと外せるようにはせず、選び直しで変える
+  cur().cond = e.target.value; generate(); persist();
+});
+document.getElementById('checks').addEventListener('change', () => {
+  cur().checks = [...document.querySelectorAll('#checks input:checked')].map((x) => x.value); generate(); persist();
+});
+document.getElementById('free').addEventListener('input', (e) => { cur().free = e.target.value; generate(); persist(); });
+
+// ===== 文章づくりの部品 =====
+// シリーズ名を商品名向けに短くする(例：「～ONE PIECE FILM Z～vol.4」→「FILM Z vol.4」)
+function cleanSeries(s) {
+  return (s || '').replace(/【[^】]*】/g, '').replace(/[～~－\-]/g, ' ').replace(/ONE PIECE|ワンピース/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
+// 人気キャラの辞書から、名前に当てはまるキャラを探す(前後に別のカタカナが続く場合は別人とみなす)
+function popularOf(name, g) {
+  const chars = DATA.tags[g].chars;
+  const n = name.normalize('NFKC');
+  return chars.find((c) => c.keys.some((k) => {
+    const kk = k.normalize('NFKC');
+    const i = n.indexOf(kk);
+    if (i < 0) return false;
+    const kana = /[ァ-ヶーぁ-ん]/;
+    const sameType = (a, b) => a && b && kana.test(a) && kana.test(b) && (/[ぁ-ん]/.test(a) === /[ぁ-ん]/.test(b));
+    return !sameType(n[i - 1], kk[0]) && !sameType(n[i + kk.length], kk[kk.length - 1]);
+  }));
+}
+// ワーコレのキャラ名を商品名向けに短くする(例：「モンキー・D・ルフィ(カジノ服)」→「ルフィ(カジノ服)」)
+function shortName(it) {
+  const name = nm(it);
+  if (it.g !== 'wcf') return name;
+  const m = name.match(/^(.*?)([（(].*)?$/);
+  const p = popularOf(m[1], 'wcf');
+  return p && m[1].length > p.ja.length + 1 ? p.ja + (m[2] || '') : name;
+}
+// ジョジョのまとめ売りの商品名では、人気キャラは短い呼び名にする(例：「魂のブチャラティ」→「ブチャラティ」)
+function jojoShort(it) { const p = popularOf(nm(it), 'jojo'); return p ? p.ja : nm(it); }
+function jojoRarity(r) { return { R: 'R', SR: 'SR', U: 'U', 'スターター': 'ST' }[r] || ''; }
+function jojoSeries(s) { return s === 'タロットカードエディション' ? 'タロット' : s === 'プロモーションカード' ? 'プロモ' : s; }
+function same(arr) { return arr.length && arr.every((x) => x === arr[0]) ? arr[0] : null; }
+
+// 優先順位の高い言葉から、40文字に収まるだけ入れる。並び順は元の順番のまま
+function fitTitle(tokens, names, nameAfter) {
+  const len = (arr) => arr.filter((t) => t.t).map((t) => t.t).join(' ').length;
+  const chosen = [];
+  for (const t of [...tokens].sort((a, b) => a.p - b.p)) {
+    if (!t.t) continue;
+    if (len([...chosen, t]) <= TITLE_MAX) chosen.push(t);
+  }
+  // キャラ名は選んだ順に、入るだけ入れる(全員入らなければ「他」を付ける)
+  const nameTok = [];
+  names.forEach((n, i) => {
+    const rest = names.length - i - 1;
+    const trial = [...chosen, ...nameTok, { t: n }, ...(rest ? [{ t: '他' }] : [])];
+    if (nameTok.length === i && len(trial) <= TITLE_MAX) nameTok.push({ t: n, o: nameAfter + 0.001 * i });
+  });
+  if (names.length && nameTok.length < names.length) {
+    if (len([...chosen, ...nameTok, { t: '他' }]) <= TITLE_MAX) nameTok.push({ t: '他', o: nameAfter + 0.9 });
+  }
+  return [...chosen, ...nameTok].sort((a, b) => a.o - b.o).map((t) => t.t).join(' ');
+}
+
+function makeTitle(its) {
+  if (!its.length) return '';
+  if (its[0].g === 'jojo') {
+    if (its.length === 1) {
+      const it = its[0];
+      return fitTitle([
+        { t: 'ジョジョABC', p: 1, o: 1 }, { t: no(it), p: 3, o: 2 }, { t: nm(it), p: 2, o: 3 }, { t: jojoRarity(it.rarity), p: 4, o: 4 },
+        { t: jojoSeries(it.series), p: 5, o: 5 }, { t: (it.parts || '').split('・')[0], p: 6, o: 6 }, { t: 'ジョジョの奇妙な冒険', p: 7, o: 7 },
+      ], [], 0);
+    }
+    const s = same(its.map((it) => it.series));
+    const r = same(its.map((it) => jojoRarity(it.rarity)));
+    const parts = [...new Set(its.flatMap((it) => (it.parts || '').split('・')).filter(Boolean))];
+    return fitTitle([
+      { t: 'ジョジョABC', p: 1, o: 1 }, { t: s ? jojoSeries(s) : '', p: 4, o: 2 }, { t: parts.length <= 2 ? parts.join(' ') : '', p: 5, o: 3 },
+      { t: r || '', p: 3, o: 4 }, { t: `${its.length}枚`, p: 2, o: 6 }, { t: s ? 'セット' : 'まとめ売り', p: 2, o: 7 },
+    ], its.map(jojoShort), 5);
+  }
+  // ワンピース
+  if (its.length === 1) {
+    const it = its[0];
+    return fitTitle([
+      { t: 'ワーコレ', p: 1, o: 1 }, { t: 'ワンピース', p: 5, o: 2 }, { t: cleanSeries(it.short), p: 3, o: 3 },
+      { t: no(it), p: 4, o: 4 }, { t: shortName(it), p: 2, o: 5 },
+    ], [], 0);
+  }
+  const si = same(its.map((it) => it.si));
+  const n = its.length;
+  if (si !== null) {
+    const kinds = its[0].kinds;
+    const series = cleanSeries(its[0].short);
+    if (kinds && n === kinds) {
+      return fitTitle([
+        { t: 'ワーコレ', p: 1, o: 1 }, { t: 'ワンピース', p: 6, o: 2 }, { t: series, p: 2, o: 3 },
+        { t: `全${n}種`, p: 3, o: 4 }, { t: 'コンプ', p: 4, o: 5 }, { t: 'セット', p: 5, o: 6 },
+      ], [], 0);
+    }
+    return fitTitle([
+      { t: 'ワーコレ', p: 1, o: 1 }, { t: 'ワンピース', p: 6, o: 2 }, { t: series, p: 2, o: 3 }, { t: `${n}体セット`, p: 3, o: 9 },
+    ], its.map(shortName), 4);
+  }
+  return fitTitle([
+    { t: 'ワーコレ', p: 1, o: 1 }, { t: 'ワンピース', p: 4, o: 2 }, { t: 'まとめ', p: 3, o: 8 }, { t: `${n}体`, p: 2, o: 9 },
+  ], its.map(shortName), 3);
+}
+
+function tagText(s) { return '#' + s.normalize('NFKC').replace(/[^\p{L}\p{N}]/gu, ''); }
+function makeTags(its) {
+  const g = state.game; const dic = DATA.tags[g];
+  const line1 = dic.base.map(tagText).join(' ');
+  // 2行目:選んだ商品に含まれる人気キャラ(最大3人)を3か国語で
+  const pops = [];
+  its.forEach((it) => { const p = popularOf(nm(it), g); if (p && !pops.includes(p)) pops.push(p); });
+  // 日本語と中国語が同じ表記(例：承太郎)のときは1つにまとめる
+  const line2 = pops.slice(0, 3).map((p) => [...new Set([p.ja, p.en, p.zh].map(tagText))].join(' ')).join(' ');
+  // 3行目:シリーズ名と、その他のキャラ(日本語)
+  const extra = [];
+  if (g === 'jojo') {
+    [...new Set(its.map((it) => jojoSeries(it.series)))].slice(0, 2).forEach((s) => extra.push('ジョジョABC' + s));
+    [...new Set(its.flatMap((it) => (it.parts || '').split('・')).filter(Boolean))].slice(0, 2).forEach((p) => extra.push(dic.parts[p] || p));
+  } else {
+    [...new Set(its.map((it) => cleanSeries(it.short)))].slice(0, 2).forEach((s) => extra.push('ワーコレ' + s));
+  }
+  const used = new Set(pops.slice(0, 3));
+  its.forEach((it) => {
+    const p = popularOf(nm(it), g);
+    if (p && used.has(p)) return;
+    const n = p ? p.ja : (g === 'wcf' ? shortName(it) : nm(it)).replace(/[（(].*$/, '');
+    if (!extra.includes(n)) extra.push(n);
+  });
+  const line3 = [...new Set(extra.map(tagText))].filter((t) => t.length > 1).slice(0, 6).join(' ');
+  return [line1, line2, line3].filter(Boolean).join('\n');
+}
+
+function makeDesc(its) {
+  if (!its.length) return '';
+  const c = cur(); const g = state.game; const out = [];
+  const si = g === 'wcf' ? same(its.map((it) => it.si)) : null;
+  const js = g === 'jojo' ? same(its.map((it) => it.series)) : null;
+  out.push('【商品】');
+  if (g === 'wcf' && si !== null) out.push(its[0].series.replace(/【[^】]*】/g, '').trim());
+  if (g === 'jojo') out.push('ジョジョの奇妙な冒険 アドベンチャーバトルカード(ABC)' + (js ? ' ' + js : ''));
+  its.forEach((it) => {
+    const n = no(it);
+    if (g === 'jojo') {
+      const info = [it.rarity && it.rarity !== 'タロット版' ? it.rarity : '', js ? '' : jojoSeries(it.series)].filter(Boolean).join('／');
+      out.push(`・${n} ${nm(it)}${info ? `(${info})` : ''}`);
+    } else {
+      out.push(`・${n ? n + ' ' : ''}${nm(it)}${si === null ? `(${cleanSeries(it.short)})` : ''}`);
+    }
+  });
+  if (g === 'wcf' && si !== null && its[0].kinds && its.length === its[0].kinds) out.push(`全${its.length}種コンプリートセットです。`);
+  else if (its.length > 1) out.push(`以上${its.length}点のセットです。`);
+
+  const cond = [];
+  if (c.cond) cond.push(`商品の状態：${c.cond}`);
+  if (c.checks.length) cond.push(c.checks.join('、'));
+  if (c.free.trim()) cond.push(c.free.trim());
+  its.forEach((it) => { const t = (c.notes[it.id] || '').trim(); if (t) cond.push(`・${no(it) || nm(it)} ${t}`); });
+  if (cond.length) out.push('', '【状態】', ...cond);
+
+  if (notice.trim()) out.push('', '【注意事項】', notice.trim());
+  out.push('', makeTags(its));
+  return out.join('\n');
+}
+
+// メルカリの「売り切れ」検索のアドレス
+function soldKeyword(its) {
+  if (!its.length) return '';
+  if (its[0].g === 'jojo') return 'ジョジョABC ' + (its.length === 1 ? nm(its[0]) : (same(its.map((it) => it.series)) || nm(its[0])));
+  if (its.length === 1) return `ワーコレ ${cleanSeries(its[0].short)} ${shortName(its[0]).replace(/[（(].*$/, '')}`;
+  return same(its.map((it) => it.si)) !== null ? `ワーコレ ${cleanSeries(its[0].short)}` : `ワーコレ ${shortName(its[0]).replace(/[（(].*$/, '')}`;
+}
+function soldUrl(kw) { return 'https://jp.mercari.com/search?keyword=' + encodeURIComponent(kw) + '&status=sold_out'; }
+
+// ===== 4. できあがり =====
+function generate() {
+  const its = selItems();
+  const t = makeTitle(its); const d = makeDesc(its);
+  document.getElementById('outTitle').value = t;
+  document.getElementById('outDesc').value = d;
+  showLen();
+  const link = document.getElementById('soldLink');
+  link.href = its.length ? soldUrl(soldKeyword(its)) : '#';
+  link.style.opacity = its.length ? 1 : 0.4;
+}
+function showLen() {
+  const t = document.getElementById('outTitle').value.length, d = document.getElementById('outDesc').value.length;
+  const tl = document.getElementById('titleLen'), dl = document.getElementById('descLen');
+  tl.textContent = `${t} / ${TITLE_MAX}文字`; tl.classList.toggle('over', t > TITLE_MAX);
+  dl.textContent = `${d} / ${DESC_MAX}文字`; dl.classList.toggle('over', d > DESC_MAX);
+}
+document.getElementById('outTitle').addEventListener('input', showLen);
+document.getElementById('outDesc').addEventListener('input', showLen);
+
+// コピー(古いスマホでも動くように予備の方法も用意)
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) {
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand('copy'); ta.remove(); return ok;
+  }
+}
+document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
+  const text = document.getElementById(b.dataset.copy).value;
+  if (!text) { toast('まだ文章がありません'); return; }
+  toast((await copyText(text)) ? 'コピーしました' : 'コピーできませんでした');
+}));
+
+function toast(msg) {
+  const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('show'), 1600);
+}
+function persist() { save('mg_state_v1', state); }
+function update() {
+  document.getElementById('selCount').textContent = cur().sel.length;
+  renderSelected(); generate(); persist();
+}
+
+// ===== ゲームの切り替え =====
+function setGame(g) {
+  state.game = g;
+  document.body.classList.toggle('wcf', g === 'wcf');
+  document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.game === g));
+  document.getElementById('q').value = '';
+  renderBrowse(); renderCondition(); update();
+}
+document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => setGame(b.dataset.game)));
+let qTimer;
+document.getElementById('q').addEventListener('input', () => { clearTimeout(qTimer); qTimer = setTimeout(renderBrowse, 200); });
+document.getElementById('clearSel').addEventListener('click', () => {
+  if (!cur().sel.length || !confirm('選んだ商品を全部外しますか?')) return;
+  cur().sel = []; cur().notes = {}; refreshRows(); update();
+});
+
+// ===== 設定画面 =====
+const settings = document.getElementById('settings');
+function ovList() {
+  return Object.entries(overrides).map(([id, v]) => {
+    const it = BYID[id] || {};
+    return { 種類: it.g === 'jojo' ? 'ジョジョABC' : 'ワンピースWCF', シリーズ: it.series, 元の番号: it.no0, 元の名前: it.name0, 番号: v.no, 名前: v.name };
+  });
+}
+function renderOvInfo() { document.getElementById('ovInfo').textContent = `直した商品：${Object.keys(overrides).length}件`; }
+document.getElementById('openSettings').addEventListener('click', () => {
+  document.getElementById('noticeText').value = notice; renderOvInfo(); settings.classList.add('show');
+});
+document.getElementById('closeSettings').addEventListener('click', () => settings.classList.remove('show'));
+settings.addEventListener('click', (e) => { if (e.target === settings) settings.classList.remove('show'); });
+document.getElementById('noticeText').addEventListener('input', (e) => { notice = e.target.value; save('mg_notice_v1', notice); generate(); });
+document.getElementById('resetNotice').addEventListener('click', () => {
+  notice = DEFAULT_NOTICE; document.getElementById('noticeText').value = notice; save('mg_notice_v1', notice); generate(); toast('元に戻しました');
+});
+document.getElementById('ovCopy').addEventListener('click', async () => {
+  if (!Object.keys(overrides).length) { toast('直した商品はありません'); return; }
+  toast((await copyText(JSON.stringify(ovList(), null, 1))) ? 'コピーしました' : 'コピーできませんでした');
+});
+document.getElementById('ovSave').addEventListener('click', () => {
+  if (!Object.keys(overrides).length) { toast('直した商品はありません'); return; }
+  const blob = new Blob([JSON.stringify(ovList(), null, 1)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `直した内容_${new Date().toISOString().slice(0, 10)}.json`; a.click();
+});
+document.getElementById('ovClear').addEventListener('click', () => {
+  if (!Object.keys(overrides).length || !confirm('直した番号・名前を全部消しますか?(元に戻せません)')) return;
+  overrides = {}; save('mg_overrides_v1', overrides); renderOvInfo(); renderBrowse(); update(); toast('消しました');
+});
+
+// ===== 起動 =====
+loadData().then(() => setGame(state.game)).catch(() => {
+  document.getElementById('browse').innerHTML = '<div class="empty">データを読み込めませんでした。通信状況を確認して開き直してください。</div>';
+});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(() => {});
+</script>
+</body>
+</html>
